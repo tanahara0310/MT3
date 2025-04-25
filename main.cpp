@@ -1,17 +1,22 @@
+#include "Class/MyMath/MyMath.h"
 #include "Collision.h"
-#include "MyMath.h"
 #include <Novice.h>
 #include <imgui.h>
 
 const char kWindowTitle[] = "LC1A_16_タナハラ_コア_タイトル";
 
-struct Vector2 {
-    float x, y;
-};
-
 //==============================
 // 関数定義
 //==============================
+
+// 平面と球の衝突判定
+bool isCollision(const Sphere& sphere, const Plane& plane);
+
+// 平面の描画
+Vector3 perpendicular(const Vector3& vector);
+
+// 平面の描画
+void DrawPlane(const Plane& plane, const Matrix4x4& viewProjectionmatrix, const Matrix4x4& viewportMatrix, uint32_t color);
 
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
@@ -41,9 +46,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     sphere1.center = { 0.0f, 0.0f, 0.0f };
     sphere1.radius = 0.5f;
 
-    Sphere sphere2;
-    sphere2.center = { 1.5f, 0.0f, 0.0f };
-    sphere2.radius = 0.5f;
+    Plane plane;
+    plane.normal = { 0.0f, 1.0f, 0.0f };
+    plane.distance = 1.0f;
 
     // ウィンドウの×ボタンが押されるまでループ
     while (Novice::ProcessMessage() == 0) {
@@ -70,12 +75,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         ImGui::SliderFloat3("Center", &sphere1.center.x, -1.0f, 1.0f, "%.2f");
         ImGui::SliderFloat("Radius", &sphere1.radius, 0.1f, 1.0f, "%.2f");
 
-        // 球2個目の描画
-        ImGui::Separator();
-        ImGui::Text("Sphere2");
-        ImGui::SliderFloat3("Center2", &sphere2.center.x, -1.0f, 1.0f, "%.2f");
-        ImGui::SliderFloat("Radius2", &sphere2.radius, 0.1f, 1.0f, "%.2f");
-
         // リセットボタン
         if (ImGui::Button("Reset")) {
             cameraTranslate = { 0.0f, 1.9f, -6.49f };
@@ -83,9 +82,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
             sphere1.center = { 0.0f, 0.0f, 0.0f };
             sphere1.radius = 0.5f;
-
-            sphere2.center = { 1.5f, 0.0f, 0.0f };
-            sphere2.radius = 0.5f;
         }
         ImGui::End();
 
@@ -103,15 +99,9 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         DrawGrid((viewMatrix * projectionMatrix), viewPortMatrix);
 
         // 球一個目の描画
-        // 球の衝突判定
-        if (isCollision(sphere1, sphere2)) {
-            DrawSphere(sphere1, (viewMatrix * projectionMatrix), viewPortMatrix, 0xFF0000FF);
-        } else {
-            DrawSphere(sphere1, (viewMatrix * projectionMatrix), viewPortMatrix, 0xFFFFFFFF);
-        }
+        DrawSphere(sphere1, (viewMatrix * projectionMatrix), viewPortMatrix, WHITE);
 
-        // 球二個目の描画
-        DrawSphere(sphere2, (viewMatrix * projectionMatrix), viewPortMatrix, 0xFFFFFFFF);
+        DrawPlane(plane, (viewMatrix * projectionMatrix), viewPortMatrix, WHITE);
 
         ///
         /// ↑描画処理ここまで
@@ -129,4 +119,44 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     // ライブラリの終了
     Novice::Finalize();
     return 0;
+}
+
+Vector3 perpendicular(const Vector3& vector)
+{
+    if (vector.x != 0.0f || vector.y != 0.0f) {
+        return { -vector.y, vector.x, 0.0f };
+    }
+
+    return { 0.0f, -vector.z, vector.y };
+}
+
+void DrawPlane(const Plane& plane, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color)
+{
+    Vector3 center = Multiply(plane.distance, plane.normal); // 1
+    Vector3 perpendiculars[4];
+
+    perpendiculars[0] = Normalize(perpendicular(plane.normal));  // 2
+    perpendiculars[1] = { -perpendiculars[0].x, -perpendiculars[0].y, -perpendiculars[0].z };
+    perpendiculars[2] = Cross(plane.normal, perpendiculars[0]);  // 4
+    perpendiculars[3] = { -perpendiculars[2].x, -perpendiculars[2].y, -perpendiculars[2].z }; // 5
+
+    // 6
+    Vector3 points[4];
+    for (int32_t index = 0; index < 4; ++index) {
+        Vector3 extend = Multiply(2.0f, perpendiculars[index]);
+        Vector3 point = Add(center, extend);
+        points[index] = TransformCoord(TransformCoord(point, viewProjectionMatrix), viewportMatrix);
+    }
+
+    Novice::DrawLine(
+        int(points[0].x), int(points[0].y), int(points[1].x), int(points[1].y), color);
+
+    Novice::DrawLine(
+        int(points[1].x), int(points[1].y), int(points[3].x), int(points[3].y), color);
+
+    Novice::DrawLine(
+        int(points[3].x), int(points[3].y), int(points[2].x), int(points[2].y), color);
+
+    Novice::DrawLine(
+        int(points[2].x), int(points[2].y), int(points[0].x), int(points[0].y), color);
 }

@@ -79,9 +79,20 @@ struct Segment {
     Vector3 diff;
 };
 
+/// <summary>
+/// 球
+/// </summary>
 struct Sphere {
     Vector3 center;
     float radius;
+};
+
+/// <summary>
+/// 平面
+/// </summary>
+struct Plane {
+    Vector3 normal; //!< 法線
+    float distance; //!< 原点からの距離
 };
 
 // 加算
@@ -178,9 +189,6 @@ void MatrixScreenPrintf(int x, int y, const Matrix4x4& matrix);
 
 void VectorScreenPrintf(int x, int y, const Vector3& vector);
 
-
 void DrawGrid(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix);
 
 void DrawSphere(const Sphere& sphere, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
-
-

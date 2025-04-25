@@ -1,5 +1,5 @@
 #pragma once
 
-#include "MyMath.h"
+#include "Class/MyMath/MyMath.h"
 
 bool isCollision(const Sphere& s1, const Sphere& s2);
