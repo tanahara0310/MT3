@@ -38,6 +38,8 @@ float Length(const Vector3& v)
 Vector3 Normalize(const Vector3& v)
 {
     float length = Length(v);
+    assert(length != 0.0f); // ゼロ除算を防ぐためのアサーション
+
     return { v.x / length, v.y / length, v.z / length };
 }
 

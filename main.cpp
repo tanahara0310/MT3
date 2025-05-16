@@ -2,6 +2,7 @@
 #include "Collision.h"
 #include <Novice.h>
 #include <imgui.h>
+#include <corecrt_math.h>
 
 const char kWindowTitle[] = "LC1A_16_タナハラ_コア_タイトル";
 
@@ -10,7 +11,7 @@ const char kWindowTitle[] = "LC1A_16_タナハラ_コア_タイトル";
 //==============================
 
 // 平面と球の衝突判定
-bool isCollision(const Sphere& sphere, const Plane& plane);
+bool IsCollision(const Sphere& sphere, const Plane& plane);
 
 // 平面の描画
 Vector3 perpendicular(const Vector3& vector);
@@ -74,6 +75,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         ImGui::Text("Sphere");
         ImGui::SliderFloat3("Center", &sphere1.center.x, -1.0f, 1.0f, "%.2f");
         ImGui::SliderFloat("Radius", &sphere1.radius, 0.1f, 1.0f, "%.2f");
+        ImGui::Separator();
+        ImGui::Text("Plane");
+        ImGui::SliderFloat3("Normal", &plane.normal.x, -1.0f, 1.0f, "%.2f");
+        plane.normal = Normalize(plane.normal);
+        ImGui::SliderFloat("Distance", &plane.distance, -5.0f, 5.0f, "%.2f");
 
         // リセットボタン
         if (ImGui::Button("Reset")) {
@@ -82,11 +88,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
             sphere1.center = { 0.0f, 0.0f, 0.0f };
             sphere1.radius = 0.5f;
+
+            plane.normal = { 0.0f, 1.0f, 0.0f };
+            plane.distance = 1.0f;
         }
         ImGui::End();
 
         cameraWorldMatrix = makeAffineMatrix({ 1.0, 1.0f, 1.0f }, cameraRotate, cameraTranslate);
         viewMatrix = Inverse(cameraWorldMatrix);
+
+        
+        
 
         ///
         /// ↑更新処理ここまで
@@ -96,11 +108,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         /// ↓描画処理ここから
         ///
 
+        //グリッド線
         DrawGrid((viewMatrix * projectionMatrix), viewPortMatrix);
 
-        // 球一個目の描画
-        DrawSphere(sphere1, (viewMatrix * projectionMatrix), viewPortMatrix, WHITE);
+        // 球の描画
+        if (IsCollision(sphere1, plane)) {
+            DrawSphere(sphere1, (viewMatrix * projectionMatrix), viewPortMatrix, RED);
+        } else {
+            DrawSphere(sphere1, (viewMatrix * projectionMatrix), viewPortMatrix, WHITE);
+        }
 
+        // 平面の描画
         DrawPlane(plane, (viewMatrix * projectionMatrix), viewPortMatrix, WHITE);
 
         ///
@@ -120,6 +138,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     Novice::Finalize();
     return 0;
 }
+
+bool IsCollision(const Sphere& sphere, const Plane& plane)
+{
+
+    // 球の中心から平面までの距離を計算
+    float distance = Dot(plane.normal, sphere.center) - plane.distance;
+    
+    //絶対距離
+    float dist = fabsf(distance);
+
+    // 球の半径と距離を比較
+    return dist <= sphere.radius;
+
+}
+
 
 Vector3 perpendicular(const Vector3& vector)
 {
@@ -149,14 +182,14 @@ void DrawPlane(const Plane& plane, const Matrix4x4& viewProjectionMatrix, const 
     }
 
     Novice::DrawLine(
-        int(points[0].x), int(points[0].y), int(points[1].x), int(points[1].y), color);
+        int(points[0].x), int(points[0].y), int(points[2].x), int(points[2].y), color);
+
+    Novice::DrawLine(
+        int(points[2].x), int(points[2].y), int(points[1].x), int(points[1].y), color);
 
     Novice::DrawLine(
         int(points[1].x), int(points[1].y), int(points[3].x), int(points[3].y), color);
 
     Novice::DrawLine(
-        int(points[3].x), int(points[3].y), int(points[2].x), int(points[2].y), color);
-
-    Novice::DrawLine(
-        int(points[2].x), int(points[2].y), int(points[0].x), int(points[0].y), color);
+        int(points[3].x), int(points[3].y), int(points[0].x), int(points[0].y), color);
 }
