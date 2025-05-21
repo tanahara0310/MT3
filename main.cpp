@@ -1,17 +1,15 @@
+#include "Class/MyMath/Collision.h"
 #include "Class/MyMath/MyMath.h"
-#include "Collision.h"
 #include <Novice.h>
 #include <imgui.h>
-#include <corecrt_math.h>
 
-const char kWindowTitle[] = "LC1A_16_タナハラ_コア_タイトル";
+const char kWindowTitle[] = "LE2B_18_タナハラ_コア_タイトル";
 
 //==============================
 // 関数定義
 //==============================
 
-// 平面と球の衝突判定
-bool IsCollision(const Sphere& sphere, const Plane& plane);
+bool IsCollision(const Segment& degment, const Plane& plane);
 
 // 平面の描画
 Vector3 perpendicular(const Vector3& vector);
@@ -42,14 +40,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(1280) / float(720), 0.1f, 100.0f);
     Matrix4x4 viewPortMatrix = MakeViewportMatrix(0.0f, 0.0f, 1280.0f, 720.0f, 0.0f, 1.0f);
 
-    // 球の変数
-    Sphere sphere1;
-    sphere1.center = { 0.0f, 0.0f, 0.0f };
-    sphere1.radius = 0.5f;
-
     Plane plane;
     plane.normal = { 0.0f, 1.0f, 0.0f };
     plane.distance = 1.0f;
+
+    Segment segment = { { -1.0, -0.5f, 0.0f }, { 2.0f, 1.0f, 0.0f } };
 
     // ウィンドウの×ボタンが押されるまでループ
     while (Novice::ProcessMessage() == 0) {
@@ -70,35 +65,33 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         ImGui::Text("Camera");
         ImGui::SliderFloat3("Translate", &cameraTranslate.x, -5.0f, 5.0f, "%.2f");
         ImGui::SliderFloat3("Rotation Angle", &cameraRotate.x, -0.52f, 0.52f, "%.2f");
-        // 球の位置を更新
-        ImGui::Separator();
-        ImGui::Text("Sphere");
-        ImGui::SliderFloat3("Center", &sphere1.center.x, -1.0f, 1.0f, "%.2f");
-        ImGui::SliderFloat("Radius", &sphere1.radius, 0.1f, 1.0f, "%.2f");
+
         ImGui::Separator();
         ImGui::Text("Plane");
         ImGui::SliderFloat3("Normal", &plane.normal.x, -1.0f, 1.0f, "%.2f");
         plane.normal = Normalize(plane.normal);
         ImGui::SliderFloat("Distance", &plane.distance, -5.0f, 5.0f, "%.2f");
 
+        ImGui::Separator();
+        ImGui::Text("Segment");
+        ImGui::SliderFloat3("Origin", &segment.origin.x, -3.0f, 3.0f, "%.2f");
+        ImGui::SliderFloat3("Diff", &segment.diff.x, -3.0f, 3.0f, "%.2f");
+
         // リセットボタン
         if (ImGui::Button("Reset")) {
             cameraTranslate = { 0.0f, 1.9f, -6.49f };
             cameraRotate = { 0.26f, 0.0f, 0.0f };
 
-            sphere1.center = { 0.0f, 0.0f, 0.0f };
-            sphere1.radius = 0.5f;
-
             plane.normal = { 0.0f, 1.0f, 0.0f };
             plane.distance = 1.0f;
+
+            segment.origin = { -2.0f, -1.0f, 0.0f };
+            segment.diff = { 3.0f, 2.0f, 0.0f };
         }
         ImGui::End();
 
         cameraWorldMatrix = makeAffineMatrix({ 1.0, 1.0f, 1.0f }, cameraRotate, cameraTranslate);
         viewMatrix = Inverse(cameraWorldMatrix);
-
-        
-        
 
         ///
         /// ↑更新処理ここまで
@@ -108,15 +101,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         /// ↓描画処理ここから
         ///
 
-        //グリッド線
-        DrawGrid((viewMatrix * projectionMatrix), viewPortMatrix);
+        Vector3 start = TransformCoord(TransformCoord(segment.origin, (viewMatrix * projectionMatrix)), viewPortMatrix);
+        Vector3 end = TransformCoord(TransformCoord(Add(segment.origin, segment.diff), (viewMatrix * projectionMatrix)), viewPortMatrix);
 
-        // 球の描画
-        if (IsCollision(sphere1, plane)) {
-            DrawSphere(sphere1, (viewMatrix * projectionMatrix), viewPortMatrix, RED);
+        if (IsCollision(segment, plane)) {
+            Novice::DrawLine(
+                int(start.x), int(start.y),
+                int(end.x), int(end.y),
+                RED);
         } else {
-            DrawSphere(sphere1, (viewMatrix * projectionMatrix), viewPortMatrix, WHITE);
+            Novice::DrawLine(
+                int(start.x), int(start.y),
+                int(end.x), int(end.y),
+                WHITE);
         }
+
+        // グリッド線
+        DrawGrid((viewMatrix * projectionMatrix), viewPortMatrix);
 
         // 平面の描画
         DrawPlane(plane, (viewMatrix * projectionMatrix), viewPortMatrix, WHITE);
@@ -139,20 +140,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     return 0;
 }
 
-bool IsCollision(const Sphere& sphere, const Plane& plane)
+bool IsCollision(const Segment& segment, const Plane& plane)
 {
+    // 垂直判定を行うために、法線と線の内積を求める
+    float dot = Dot(plane.normal, segment.diff);
 
-    // 球の中心から平面までの距離を計算
-    float distance = Dot(plane.normal, sphere.center) - plane.distance;
-    
-    //絶対距離
-    float dist = fabsf(distance);
+    // 内積が0の場合、平面と線分は平行
+    if (dot == 0.0f) {
+        return false;
+    }
 
-    // 球の半径と距離を比較
-    return dist <= sphere.radius;
+    // tを求める
+    float t = (plane.distance - Dot(segment.origin, plane.normal)) / dot;
 
+    return (0.0f <= t && t <= 1.0f);
 }
-
 
 Vector3 perpendicular(const Vector3& vector)
 {
@@ -168,9 +170,9 @@ void DrawPlane(const Plane& plane, const Matrix4x4& viewProjectionMatrix, const 
     Vector3 center = Multiply(plane.distance, plane.normal); // 1
     Vector3 perpendiculars[4];
 
-    perpendiculars[0] = Normalize(perpendicular(plane.normal));  // 2
+    perpendiculars[0] = Normalize(perpendicular(plane.normal)); // 2
     perpendiculars[1] = { -perpendiculars[0].x, -perpendiculars[0].y, -perpendiculars[0].z };
-    perpendiculars[2] = Cross(plane.normal, perpendiculars[0]);  // 4
+    perpendiculars[2] = Cross(plane.normal, perpendiculars[0]); // 4
     perpendiculars[3] = { -perpendiculars[2].x, -perpendiculars[2].y, -perpendiculars[2].z }; // 5
 
     // 6
