@@ -20,10 +20,13 @@
     <ClCompile Include="C:\KamataEngine\Adapter\Novice.cpp">
       <Filter>KamataEngine\Adapter</Filter>
     </ClCompile>
-    <ClCompile Include="MyMath.cpp">
+    <ClCompile Include="Collision.cpp">
       <Filter>KamataEngine</Filter>
     </ClCompile>
-    <ClCompile Include="Collision.cpp">
+    <ClCompile Include="Class\MyMath\MyMath.cpp">
+      <Filter>KamataEngine</Filter>
+    </ClCompile>
+    <ClCompile Include="Class\MyMath\Collision.cpp">
       <Filter>KamataEngine</Filter>
     </ClCompile>
   </ItemGroup>
@@ -109,7 +112,8 @@
     <ClInclude Include="C:\KamataEngine\DirectXGame\2d\ImGuiManager.h">
       <Filter>KamataEngine\Include</Filter>
     </ClInclude>
-    <ClInclude Include="MyMath.h" />
     <ClInclude Include="Collision.h" />
+    <ClInclude Include="Class\MyMath\MyMath.h" />
+    <ClInclude Include="Class\MyMath\Collision.h" />
   </ItemGroup>
 </Project>
