@@ -9,13 +9,13 @@ const char kWindowTitle[] = "LE2B_18_タナハラ_コア_タイトル";
 // 関数定義
 //==============================
 
-bool IsCollision(const Segment& degment, const Plane& plane);
-
 // 平面の描画
 Vector3 perpendicular(const Vector3& vector);
 
 // 平面の描画
 void DrawPlane(const Plane& plane, const Matrix4x4& viewProjectionmatrix, const Matrix4x4& viewportMatrix, uint32_t color);
+
+void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
 
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
@@ -39,12 +39,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     Matrix4x4 viewMatrix = Inverse(cameraWorldMatrix);
     Matrix4x4 projectionMatrix = MakePerspectiveFovMatrix(0.45f, float(1280) / float(720), 0.1f, 100.0f);
     Matrix4x4 viewPortMatrix = MakeViewportMatrix(0.0f, 0.0f, 1280.0f, 720.0f, 0.0f, 1.0f);
-
-    Plane plane;
-    plane.normal = { 0.0f, 1.0f, 0.0f };
-    plane.distance = 1.0f;
+    Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 
     Segment segment = { { -1.0, -0.5f, 0.0f }, { 2.0f, 1.0f, 0.0f } };
+    Triangle triangle = { { { -1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.5f, 1.0f, 0.0f } } };
 
     // ウィンドウの×ボタンが押されるまでループ
     while (Novice::ProcessMessage() == 0) {
@@ -67,23 +65,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         ImGui::SliderFloat3("Rotation Angle", &cameraRotate.x, -0.52f, 0.52f, "%.2f");
 
         ImGui::Separator();
-        ImGui::Text("Plane");
-        ImGui::SliderFloat3("Normal", &plane.normal.x, -1.0f, 1.0f, "%.2f");
-        plane.normal = Normalize(plane.normal);
-        ImGui::SliderFloat("Distance", &plane.distance, -5.0f, 5.0f, "%.2f");
+        ImGui::Text("Segment");
+        ImGui::DragFloat3("Origin", &segment.origin.x, 0.01f, -3.0f, 3.0f, "%.2f");
+        ImGui::DragFloat3("Diff", &segment.diff.x, 0.01f, -3.0f, 3.0f, "%.2f");
 
         ImGui::Separator();
-        ImGui::Text("Segment");
-        ImGui::SliderFloat3("Origin", &segment.origin.x, -3.0f, 3.0f, "%.2f");
-        ImGui::SliderFloat3("Diff", &segment.diff.x, -3.0f, 3.0f, "%.2f");
+        ImGui::Text("Triangle");
+        ImGui::SliderFloat3("v0", &triangle.vertices[0].x, -3.0f, 3.0f, "%.2f");
+        ImGui::SliderFloat3("v1", &triangle.vertices[1].x, -3.0f, 3.0f, "%.2f");
+        ImGui::SliderFloat3("v2", &triangle.vertices[2].x, -3.0f, 3.0f, "%.2f");
+        ImGui::Separator();
+
+        ImGui::Text("v0: (%.2f, %.2f, %.2f)", triangle.vertices[0].x, triangle.vertices[0].y, triangle.vertices[0].z);
+        ImGui::Text("v1: (%.2f, %.2f, %.2f)", triangle.vertices[1].x, triangle.vertices[1].y, triangle.vertices[1].z);
+        ImGui::Text("v2: (%.2f, %.2f, %.2f)", triangle.vertices[2].x, triangle.vertices[2].y, triangle.vertices[2].z);
 
         // リセットボタン
         if (ImGui::Button("Reset")) {
             cameraTranslate = { 0.0f, 1.9f, -6.49f };
             cameraRotate = { 0.26f, 0.0f, 0.0f };
-
-            plane.normal = { 0.0f, 1.0f, 0.0f };
-            plane.distance = 1.0f;
 
             segment.origin = { -2.0f, -1.0f, 0.0f };
             segment.diff = { 3.0f, 2.0f, 0.0f };
@@ -92,6 +92,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
         cameraWorldMatrix = makeAffineMatrix({ 1.0, 1.0f, 1.0f }, cameraRotate, cameraTranslate);
         viewMatrix = Inverse(cameraWorldMatrix);
+        viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 
         ///
         /// ↑更新処理ここまで
@@ -101,26 +102,23 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         /// ↓描画処理ここから
         ///
 
-        Vector3 start = TransformCoord(TransformCoord(segment.origin, (viewMatrix * projectionMatrix)), viewPortMatrix);
-        Vector3 end = TransformCoord(TransformCoord(Add(segment.origin, segment.diff), (viewMatrix * projectionMatrix)), viewPortMatrix);
+        Vector3 start = TransformCoord(TransformCoord(segment.origin, viewProjectionMatrix), viewPortMatrix);
+        Vector3 end = TransformCoord(TransformCoord(Add(segment.origin, segment.diff), viewProjectionMatrix), viewPortMatrix);
 
-        if (IsCollision(segment, plane)) {
-            Novice::DrawLine(
-                int(start.x), int(start.y),
-                int(end.x), int(end.y),
-                RED);
+        Novice::DrawLine(
+            int(start.x), int(start.y),
+            int(end.x), int(end.y),
+            WHITE);
+
+        //当たり判定
+        if (IsCollision(triangle,segment)) {
+            DrawTriangle(triangle, viewProjectionMatrix, viewPortMatrix, RED);
         } else {
-            Novice::DrawLine(
-                int(start.x), int(start.y),
-                int(end.x), int(end.y),
-                WHITE);
+            DrawTriangle(triangle, viewProjectionMatrix, viewPortMatrix, WHITE);
         }
 
         // グリッド線
-        DrawGrid((viewMatrix * projectionMatrix), viewPortMatrix);
-
-        // 平面の描画
-        DrawPlane(plane, (viewMatrix * projectionMatrix), viewPortMatrix, WHITE);
+        DrawGrid(viewProjectionMatrix, viewPortMatrix);
 
         ///
         /// ↑描画処理ここまで
@@ -138,22 +136,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     // ライブラリの終了
     Novice::Finalize();
     return 0;
-}
-
-bool IsCollision(const Segment& segment, const Plane& plane)
-{
-    // 垂直判定を行うために、法線と線の内積を求める
-    float dot = Dot(plane.normal, segment.diff);
-
-    // 内積が0の場合、平面と線分は平行
-    if (dot == 0.0f) {
-        return false;
-    }
-
-    // tを求める
-    float t = (plane.distance - Dot(segment.origin, plane.normal)) / dot;
-
-    return (0.0f <= t && t <= 1.0f);
 }
 
 Vector3 perpendicular(const Vector3& vector)
@@ -194,4 +176,17 @@ void DrawPlane(const Plane& plane, const Matrix4x4& viewProjectionMatrix, const 
 
     Novice::DrawLine(
         int(points[3].x), int(points[3].y), int(points[0].x), int(points[0].y), color);
+}
+
+void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color)
+{
+    Vector3 points[3];
+
+    for (int i = 0; i < 3; ++i) {
+        points[i] = TransformCoord(TransformCoord(triangle.vertices[i], viewProjectionMatrix), viewportMatrix);
+    }
+
+    Novice::DrawLine((int)points[0].x, (int)points[0].y, (int)points[1].x, (int)points[1].y, color);
+    Novice::DrawLine((int)points[1].x, (int)points[1].y, (int)points[2].x, (int)points[2].y, color);
+    Novice::DrawLine((int)points[2].x, (int)points[2].y, (int)points[0].x, (int)points[0].y, color);
 }
