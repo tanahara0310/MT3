@@ -96,6 +96,10 @@ struct Plane {
     float distance; //!< 原点からの距離
 };
 
+struct Triangle {
+    Vector3 vertices[3];
+};
+
 // 加算
 Vector3 Add(const Vector3& v1, const Vector3& v2);
 
