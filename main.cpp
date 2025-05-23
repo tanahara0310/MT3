@@ -9,6 +9,7 @@ const char kWindowTitle[] = "LE2B_18_タナハラ_コア_タイトル";
 // 関数定義
 //==============================
 
+// デバッグカメラ
 struct DebugCamera {
     float distance = 6.0f;
     float pitch = 0.0f; // 上下
@@ -75,7 +76,7 @@ struct DebugCamera {
         // ドラッグによる回転
         if (draggingLeft) {
             ImVec2 delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
-            yaw += delta.x * 0.01f;
+            yaw -= delta.x * 0.01f;
             pitch -= delta.y * 0.01f;
             pitch = std::clamp(pitch, -1.5f, 1.5f);
             ImGui::ResetMouseDragDelta(ImGuiMouseButton_Left);
@@ -92,8 +93,8 @@ struct DebugCamera {
             Vector3 right = Normalize(Cross({ 0.0f, 1.0f, 0.0f }, forward));
             Vector3 up = Normalize(Cross(forward, right));
 
-            target = Add(target, Multiply(-delta.x * 0.01f, right));
-            target = Add(target, Multiply(delta.y * 0.01f, up));
+            target = Add(target, Multiply(delta.x * 0.01f, right));
+            target = Add(target, Multiply(-delta.y * 0.01f, up));
             ImGui::ResetMouseDragDelta(ImGuiMouseButton_Middle);
         }
 
@@ -143,14 +144,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     DebugCamera debugCamera;
 
     AABB aabb1 = {
-        .min { -0.5f, -0.5f, -0.5f },
-        .max { 0.0f, 0.0f, 0.0f }
+        .min { 0.0f, 0.0f, 0.5f },
+        .max { 0.3f, 0.5f, 1.0f }
     };
 
-    AABB aabb2 = {
-        .min { 0.2f, 0.2f, 0.2f },
-        .max { 1.0f, 1.0f, 1.0f }
+    Sphere sphere = {
+        .center { 1.0f, 0.5f, 0.0f },
+        .radius { 0.5f }
     };
+
+    /* AABB aabb2 = {
+         .min { 0.2f, 0.2f, 0.2f },
+         .max { 1.0f, 1.0f, 1.0f }
+     };*/
 
     // ウィンドウの×ボタンが押されるまでループ
     while (Novice::ProcessMessage() == 0) {
@@ -171,9 +177,11 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         ImGui::DragFloat3("AABB1 Min", &aabb1.min.x, 0.01f, -5.0f, 5.0f, "%.2f");
         ImGui::DragFloat3("AABB1 Max", &aabb1.max.x, 0.01f, -5.0f, 5.0f, "%.2f");
         ImGui::Separator();
-        ImGui::Text("AABB2");
-        ImGui::DragFloat3("AABB2 Min", &aabb2.min.x, 0.01f, -5.0f, 5.0f, "%.2f");
-        ImGui::DragFloat3("AABB2 Max", &aabb2.max.x, 0.01f, -5.0f, 5.0f, "%.2f");
+
+        // 球
+        ImGui::Text("Sphere");
+        ImGui::DragFloat3("Sphere Center", &sphere.center.x, 0.01f, -5.0f, 5.0f, "%.2f");
+        ImGui::DragFloat("Sphere Radius", &sphere.radius, 0.01f, 0.0f, 5.0f, "%.2f");
 
         // リセットボタン
         if (ImGui::Button("ObjectReset")) {
@@ -181,10 +189,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             aabb1.min = { -0.5f, -0.5f, -0.5f };
             aabb1.max = { 0.0f, 0.0f, 0.0f };
 
-            aabb2.min = { 0.2f, 0.2f, 0.2f };
-            aabb2.max = { 1.0f, 1.0f, 1.0f };
+            sphere.center = { 1.0f, 0.0f, 0.0f };
+            sphere.radius = 0.5f;
         }
+
         ImGui::Separator();
+        // カメラ情報
+        ImGui::Text("Camera");
+        ImGui::Text("Distance: %.2f", debugCamera.distance);
+        ImGui::Text("Pitch: %.2f", debugCamera.pitch);
+        ImGui::Text("Yaw: %.2f", debugCamera.yaw);
+        ImGui::Text("Target: (%.2f, %.2f, %.2f)", debugCamera.target.x, debugCamera.target.y, debugCamera.target.z);
+        ImGui::Separator();
+
         // デバッグカメラリセット
         if (ImGui::Button("CameraReset")) {
             debugCamera.Reset();
@@ -204,15 +221,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         /// ↓描画処理ここから
         ///
 
-        // AABB1の描画
-        if (IsCollision(aabb1, aabb2)) {
-            DrawAABB(aabb1, viewProjectionMatrix, viewPortMatrix, RED);
+        // 球を描画
+        if (IsCollision(sphere, aabb1)) {
+            DrawSphere(sphere, viewProjectionMatrix, viewPortMatrix, RED);
         } else {
-            DrawAABB(aabb1, viewProjectionMatrix, viewPortMatrix, WHITE);
+
+            DrawSphere(sphere, viewProjectionMatrix, viewPortMatrix, WHITE);
         }
 
         // AABB2の描画
-        DrawAABB(aabb2, viewProjectionMatrix, viewPortMatrix, WHITE);
+        DrawAABB(aabb1, viewProjectionMatrix, viewPortMatrix, WHITE);
 
         // グリッド線
         DrawGrid(viewProjectionMatrix, viewPortMatrix);

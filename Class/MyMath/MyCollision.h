@@ -33,3 +33,6 @@ bool IsCollision(const Triangle& triangle, const Segment& segment);
 /// <param name="aabb2"></param>
 /// <returns></returns>
 bool IsCollision(const AABB& aabb1, const AABB& aabb2);
+
+// 球とAABBの衝突判定
+bool IsCollision(const Sphere& sphere, const AABB& aabb);
