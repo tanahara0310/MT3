@@ -103,3 +103,60 @@ bool IsCollision(const Sphere& sphere, const AABB& aabb)
 
     return false; // 衝突していない
 }
+
+// AABBと線分の衝突判定
+bool IsCollision(const AABB& aabb, const Segment& segment)
+{
+    constexpr float kInf = 1e10f;
+
+    float txmin;
+    float txmax;
+    float tymin;
+    float tymax;
+    float tzmin;
+    float tzmax;
+
+    // x軸
+    if (segment.diff.x == 0.0f) {
+        if (segment.origin.x < aabb.min.x || segment.origin.x > aabb.max.x)
+            return false;
+        txmin = -kInf;
+        txmax = +kInf;
+    } else {
+        txmin = (aabb.min.x - segment.origin.x) / segment.diff.x;
+        txmax = (aabb.max.x - segment.origin.x) / segment.diff.x;
+        if (txmin > txmax)
+            std::swap(txmin, txmax);
+    }
+
+    // y軸
+    if (segment.diff.y == 0.0f) {
+        if (segment.origin.y < aabb.min.y || segment.origin.y > aabb.max.y)
+            return false;
+        tymin = -kInf;
+        tymax = +kInf;
+    } else {
+        tymin = (aabb.min.y - segment.origin.y) / segment.diff.y;
+        tymax = (aabb.max.y - segment.origin.y) / segment.diff.y;
+        if (tymin > tymax)
+            std::swap(tymin, tymax);
+    }
+
+    // z軸
+    if (segment.diff.z == 0.0f) {
+        if (segment.origin.z < aabb.min.z || segment.origin.z > aabb.max.z)
+            return false;
+        tzmin = -kInf;
+        tzmax = +kInf;
+    } else {
+        tzmin = (aabb.min.z - segment.origin.z) / segment.diff.z;
+        tzmax = (aabb.max.z - segment.origin.z) / segment.diff.z;
+        if (tzmin > tzmax)
+            std::swap(tzmin, tzmax);
+    }
+
+    float tmin = std::max(std::max(txmin, tymin), tzmin);
+    float tmax = std::min(std::min(txmax, tymax), tzmax);
+
+    return (tmin <= tmax) && (tmax >= 0.0f) && (tmin <= 1.0f);
+}
