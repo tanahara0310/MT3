@@ -144,19 +144,14 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     DebugCamera debugCamera;
 
     AABB aabb1 = {
-        .min { 0.0f, 0.0f, 0.5f },
-        .max { 0.3f, 0.5f, 1.0f }
+        .min { -0.5f, -0.5f, -0.5f },
+        .max { 0.5f, 0.5f, 0.5f }
     };
 
-    Sphere sphere = {
-        .center { 1.0f, 0.5f, 0.0f },
-        .radius { 0.5f }
+    Segment segment = {
+        .origin { -0.7f, 0.3f, 0.0f },
+        .diff { 2.0f, -0.5f, 0.0f }
     };
-
-    /* AABB aabb2 = {
-         .min { 0.2f, 0.2f, 0.2f },
-         .max { 1.0f, 1.0f, 1.0f }
-     };*/
 
     // ウィンドウの×ボタンが押されるまでループ
     while (Novice::ProcessMessage() == 0) {
@@ -177,20 +172,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         ImGui::DragFloat3("AABB1 Min", &aabb1.min.x, 0.01f, -5.0f, 5.0f, "%.2f");
         ImGui::DragFloat3("AABB1 Max", &aabb1.max.x, 0.01f, -5.0f, 5.0f, "%.2f");
         ImGui::Separator();
-
-        // 球
-        ImGui::Text("Sphere");
-        ImGui::DragFloat3("Sphere Center", &sphere.center.x, 0.01f, -5.0f, 5.0f, "%.2f");
-        ImGui::DragFloat("Sphere Radius", &sphere.radius, 0.01f, 0.0f, 5.0f, "%.2f");
+        // 線分
+        ImGui::Text("Segment");
+        ImGui::DragFloat3("Segment Origin", &segment.origin.x, 0.01f, -5.0f, 5.0f, "%.2f");
+        ImGui::DragFloat3("Segment Diff", &segment.diff.x, 0.01f, -5.0f, 5.0f, "%.2f");
 
         // リセットボタン
         if (ImGui::Button("ObjectReset")) {
 
             aabb1.min = { -0.5f, -0.5f, -0.5f };
-            aabb1.max = { 0.0f, 0.0f, 0.0f };
+            aabb1.max = { 0.5f, 0.5f, 0.5f };
 
-            sphere.center = { 1.0f, 0.0f, 0.0f };
-            sphere.radius = 0.5f;
+            segment.origin = { -0.7f, 0.3f, 0.0f };
+            segment.diff = { 2.0f, -0.5f, 0.0f };
         }
 
         ImGui::Separator();
@@ -221,16 +215,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         /// ↓描画処理ここから
         ///
 
-        // 球を描画
-        if (IsCollision(sphere, aabb1)) {
-            DrawSphere(sphere, viewProjectionMatrix, viewPortMatrix, RED);
+        // AABB2の描画
+        if (IsCollision(aabb1, segment)) {
+            DrawAABB(aabb1, viewProjectionMatrix, viewPortMatrix, RED);
         } else {
 
-            DrawSphere(sphere, viewProjectionMatrix, viewPortMatrix, WHITE);
+            DrawAABB(aabb1, viewProjectionMatrix, viewPortMatrix, WHITE);
         }
 
-        // AABB2の描画
-        DrawAABB(aabb1, viewProjectionMatrix, viewPortMatrix, WHITE);
+        // 線分の描画
+        Vector3 start = TransformCoord(TransformCoord(segment.origin, viewProjectionMatrix), viewPortMatrix);
+        Vector3 end = TransformCoord(TransformCoord(Add(segment.origin, segment.diff), viewProjectionMatrix), viewPortMatrix);
+
+        Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), WHITE);
 
         // グリッド線
         DrawGrid(viewProjectionMatrix, viewPortMatrix);
