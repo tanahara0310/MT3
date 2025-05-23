@@ -1,8 +1,8 @@
 ﻿#include "MyMath.h"
 #include <Novice.h>
 #include <assert.h>
-#define _USE_MATH_DEFINES
 #include <cmath>
+#include <numbers>
 
 // ベクトルの加算
 Vector3 Add(const Vector3& v1, const Vector3& v2)
@@ -444,6 +444,26 @@ Matrix4x4 makeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Ve
     return result;
 }
 
+Matrix4x4 MakeLookAtMatrix(const Vector3& eye, const Vector3& target, const Vector3& up)
+{
+    // 視線方向（カメラのZ軸）
+    Vector3 zAxis = Normalize(Subtract(target, eye));
+    // 右方向（カメラのX軸）
+    Vector3 xAxis = Normalize(Cross(up, zAxis));
+    // 上方向（カメラのY軸）
+    Vector3 yAxis = Cross(zAxis, xAxis);
+
+    // 行優先（または列優先）に応じて要調整
+    Matrix4x4 result = {
+        xAxis.x, yAxis.x, zAxis.x, 0.0f,
+        xAxis.y, yAxis.y, zAxis.y, 0.0f,
+        xAxis.z, yAxis.z, zAxis.z, 0.0f,
+        -Dot(xAxis, eye), -Dot(yAxis, eye), -Dot(zAxis, eye), 1.0f
+    };
+
+    return result;
+}
+
 //================================================
 // 　レンダリングパイプライン用
 //================================================
@@ -685,16 +705,16 @@ void DrawSphere(const Sphere& sphere, const Matrix4x4& viewProjectionMatrix, con
     const uint32_t kSubDivision = 20;
 
     // 経度分割１つ分の角度
-    const float kLongEvery = 2.0f * static_cast<float>(M_PI) / static_cast<float>(kSubDivision);
+    const float kLongEvery = 2.0f * std::numbers::pi_v<float> / static_cast<float>(kSubDivision);
 
     // 緯度分割１つ分の角度
-    const float kLatEvery = static_cast<float>(M_PI) / static_cast<float>(kSubDivision);
+    const float kLatEvery = std::numbers::pi_v<float> / static_cast<float>(kSubDivision);
 
     // 緯度の方向に分割 -π/2 ~ π/2
     for (uint32_t latIndex = 0; latIndex < kSubDivision; ++latIndex) {
 
         // 現在の緯度
-        float lat = -static_cast<float>(M_PI) / 2.0f + kLatEvery * latIndex;
+        float lat = -std::numbers::pi_v<float> / 2.0f + kLatEvery * latIndex;
 
         // 経度の方向に分割 0 ~ 2π
         for (uint32_t lonIndex = 0; lonIndex < kSubDivision; ++lonIndex) {

@@ -9,6 +9,100 @@ const char kWindowTitle[] = "LE2B_18_タナハラ_コア_タイトル";
 // 関数定義
 //==============================
 
+struct DebugCamera {
+    float distance = 6.0f;
+    float pitch = 0.0f; // 上下
+    float yaw = std::numbers::pi_v<float>; // 左右
+    Vector3 target = { 0.0f, 0.7f, 0.0f }; // 注視点
+
+    bool draggingLeft = false;
+    bool draggingMiddle = false;
+    ImVec2 prevMousePos = { 0.0f, 0.0f };
+
+    /// <summary>
+    /// カメラリセット
+    /// </summary>
+    void Reset()
+    {
+        distance = 6.0f;
+        pitch = 0.0f;
+        yaw = std::numbers::pi_v<float>;
+        target = { 0.0f, 0.7f, 0.0f };
+    }
+
+    Vector3 GetPosition() const
+    {
+        return {
+            target.x + distance * cosf(pitch) * sinf(yaw),
+            target.y + distance * sinf(pitch),
+            target.z + distance * cosf(pitch) * cosf(yaw)
+        };
+    }
+
+    // View行列を作成
+    Matrix4x4 GetViewMatrix() const
+    {
+        return MakeLookAtMatrix(GetPosition(), target, { 0.0f, 1.0f, 0.0f });
+    }
+
+    /// <summary>
+    /// デバッグカメラの更新
+    /// </summary>
+    void UpdateFromImGui()
+    {
+        ImGuiIO& io = ImGui::GetIO();
+
+        // マウス入力対象外のUI上では無視
+        if (ImGui::IsAnyItemActive() || io.WantCaptureMouse) {
+            draggingLeft = false;
+            draggingMiddle = false;
+            return;
+        }
+
+        // ドラッグ状態更新
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+            draggingLeft = true;
+        } else if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            draggingLeft = false;
+        }
+
+        if (ImGui::IsMouseClicked(ImGuiMouseButton_Middle)) {
+            draggingMiddle = true;
+        } else if (!ImGui::IsMouseDown(ImGuiMouseButton_Middle)) {
+            draggingMiddle = false;
+        }
+
+        // ドラッグによる回転
+        if (draggingLeft) {
+            ImVec2 delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
+            yaw += delta.x * 0.01f;
+            pitch -= delta.y * 0.01f;
+            pitch = std::clamp(pitch, -1.5f, 1.5f);
+            ImGui::ResetMouseDragDelta(ImGuiMouseButton_Left);
+        }
+
+        // ドラッグによるパン（視点の移動）
+        if (draggingMiddle) {
+            ImVec2 delta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Middle);
+            Vector3 forward = {
+                cosf(pitch) * sinf(yaw),
+                sinf(pitch),
+                cosf(pitch) * cosf(yaw)
+            };
+            Vector3 right = Normalize(Cross({ 0.0f, 1.0f, 0.0f }, forward));
+            Vector3 up = Normalize(Cross(forward, right));
+
+            target = Add(target, Multiply(-delta.x * 0.01f, right));
+            target = Add(target, Multiply(delta.y * 0.01f, up));
+            ImGui::ResetMouseDragDelta(ImGuiMouseButton_Middle);
+        }
+
+        // ホイールによるズーム
+        distance -= io.MouseWheel * 0.5f;
+        distance = std::clamp(distance, 1.0f, 50.0f);
+    }
+};
+
 // 平面の描画
 Vector3 perpendicular(const Vector3& vector);
 
@@ -46,6 +140,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     Matrix4x4 viewPortMatrix = MakeViewportMatrix(0.0f, 0.0f, 1280.0f, 720.0f, 0.0f, 1.0f);
     Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 
+    DebugCamera debugCamera;
+
     AABB aabb1 = {
         .min { -0.5f, -0.5f, -0.5f },
         .max { 0.0f, 0.0f, 0.0f }
@@ -69,13 +165,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         /// ↓更新処理ここから
         ///
 
-        // カメラや球の位置を更新
-        ImGui::Begin("Object");
-        ImGui::Separator();
-        ImGui::Text("Camera");
-        ImGui::SliderFloat3("Translate", &cameraTranslate.x, -5.0f, 5.0f, "%.2f");
-        ImGui::SliderFloat3("Rotation Angle", &cameraRotate.x, -0.52f, 0.52f, "%.2f");
-
         // AABBの更新
         ImGui::Separator();
         ImGui::Text("AABB1");
@@ -87,9 +176,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         ImGui::DragFloat3("AABB2 Max", &aabb2.max.x, 0.01f, -5.0f, 5.0f, "%.2f");
 
         // リセットボタン
-        if (ImGui::Button("Reset")) {
-            cameraTranslate = { 0.0f, 1.9f, -6.49f };
-            cameraRotate = { 0.26f, 0.0f, 0.0f };
+        if (ImGui::Button("ObjectReset")) {
 
             aabb1.min = { -0.5f, -0.5f, -0.5f };
             aabb1.max = { 0.0f, 0.0f, 0.0f };
@@ -97,10 +184,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
             aabb2.min = { 0.2f, 0.2f, 0.2f };
             aabb2.max = { 1.0f, 1.0f, 1.0f };
         }
+        ImGui::Separator();
+        // デバッグカメラリセット
+        if (ImGui::Button("CameraReset")) {
+            debugCamera.Reset();
+        }
         ImGui::End();
 
-        cameraWorldMatrix = makeAffineMatrix({ 1.0, 1.0f, 1.0f }, cameraRotate, cameraTranslate);
-        viewMatrix = Inverse(cameraWorldMatrix);
+        debugCamera.UpdateFromImGui();
+
+        viewMatrix = debugCamera.GetViewMatrix();
         viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 
         ///
