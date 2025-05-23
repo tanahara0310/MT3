@@ -18,7 +18,18 @@ bool IsCollision(const Sphere& sphere, const Plane& plane);
 /// <returns></returns>
 bool IsCollision(const Segment& degment, const Plane& plane);
 
-// 三角形と線の描画
+/// <summary>
+/// 三角形と線分の衝突判定
+/// </summary>
+/// <param name="triangle"></param>
+/// <param name="segment"></param>
+/// <returns></returns>
 bool IsCollision(const Triangle& triangle, const Segment& segment);
 
+/// <summary>
+/// AABBとAABBの衝突判定
+/// </summary>
+/// <param name="aabb1"></param>
+/// <param name="aabb2"></param>
+/// <returns></returns>
 bool IsCollision(const AABB& aabb1, const AABB& aabb2);
