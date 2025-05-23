@@ -1,7 +1,9 @@
 ﻿#pragma once
 
 #include <cstdint>
-
+#include <cmath>
+#include <algorithm>
+#include <numbers>
 
 static const int kRowHeight = 20;
 static const int kColumnWidth = 60;
@@ -171,6 +173,9 @@ Matrix4x4 MakeRotationZMatrix(float radian);
 
 // 3次元アフィン変換
 Matrix4x4 makeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Vector3& translate);
+
+Matrix4x4 MakeLookAtMatrix(const Vector3& eye, const Vector3& target, const Vector3& up);
+
 
 //================================================
 // 　レンダリングパイプライン用
