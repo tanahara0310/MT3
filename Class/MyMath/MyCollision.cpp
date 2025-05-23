@@ -1,4 +1,4 @@
-#include "Collision.h"
+#include "MyCollision.h"
 #include <math.h>
 
 // 平面と球の衝突判定
@@ -32,6 +32,7 @@ bool IsCollision(const Segment& segment, const Plane& plane)
     return (0.0f <= t && t <= 1.0f);
 }
 
+// 三角形と線分の衝突判定
 bool IsCollision(const Triangle& triangle, const Segment& segment)
 {
     // 法線を求める
@@ -68,4 +69,18 @@ bool IsCollision(const Triangle& triangle, const Segment& segment)
     }
 
     return false;
+}
+
+// AABBの衝突判定
+bool IsCollision(const AABB& aabb1, const AABB& aabb2)
+{
+    // AABBの最小点と最大点を比較して、衝突判定を行う
+    if ((aabb1.min.x <= aabb2.max.x && aabb1.max.x >= aabb2.min.x) && // x軸
+        (aabb1.min.y <= aabb2.max.y && aabb1.max.y >= aabb2.min.y) && // y軸
+        (aabb1.min.z <= aabb2.max.z && aabb1.max.z >= aabb2.min.z)) { // z軸
+
+        return true; // 衝突している
+    }
+
+    return false; // 衝突していない
 }
