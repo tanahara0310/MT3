@@ -96,8 +96,16 @@ struct Plane {
     float distance; //!< 原点からの距離
 };
 
+/// <summary>
+/// 三角形
+/// </summary>
 struct Triangle {
     Vector3 vertices[3];
+};
+
+struct AABB {
+    Vector3 min; //!< 最小点
+    Vector3 max; //!< 最大点
 };
 
 // 加算
