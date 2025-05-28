@@ -613,6 +613,16 @@ Vector3 ClosestPoint(const Vector3& point, const Segment& segment)
     return result;
 }
 
+Vector3 Lerp(const Vector3& v1, const Vector3& v2, float t)
+{
+    Vector3 result;
+    // v1とv2の間をtの割合で補間
+    result.x = v1.x + (v2.x - v1.x) * t;
+    result.y = v1.y + (v2.y - v1.y) * t;
+    result.z = v1.z + (v2.z - v1.z) * t;
+    return result;
+}
+
 // デバッグ用関数
 void MatrixScreenPrintf(int x, int y, const Matrix4x4& matrix)
 {
