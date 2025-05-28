@@ -151,25 +151,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 #pragma endregion
 
-#pragma region 階層構造を構築
+#pragma region 演算子オーバーロード
 
-    Vector3 translates[3] = {
-        { 0.2f, 1.0f, 0.0f },
-        { 0.4f, 0.0f, 0.0f },
-        { 0.3f, 0.0f, 0.0f },
-    };
+    Vector3 a { 0.2f, 1.0f, 0.0f };
+    Vector3 b { 2.4f, 3.1f, 1.2f };
 
-    Vector3 rotates[3] = {
-        { 0.0f, 0.0f, -6.8f },
-        { 0.0f, 0.0f, -1.4f },
-        { 0.0f, 0.0f, 0.0f },
-    };
+    Vector3 c = a + b;
+    Vector3 d = a - b;
+    Vector3 e = a * 2.4f;
+    Vector3 rotate { 0.4f, 1.43f, -0.8f };
 
-    Vector3 scales[3] = {
-        { 1.0f, 1.0f, 1.0f },
-        { 1.0f, 1.0f, 1.0f },
-        { 1.0f, 1.0f, 1.0f },
-    };
+    Matrix4x4 rotateXMatrix = MakeRotationXMatrix(rotate.x);
+    Matrix4x4 rotateYMatrix = MakeRotationYMatrix(rotate.y);
+    Matrix4x4 rotateZMatrix = MakeRotationZMatrix(rotate.z);
+    Matrix4x4 rotateMatrix = rotateXMatrix * rotateYMatrix * rotateZMatrix;
 
 #pragma endregion
 
@@ -186,59 +181,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         /// ↓更新処理ここから
         ///
 
-        // リセットボタン
-        if (ImGui::Button("ObjectReset")) {
-        }
+        ImGui::Begin("Window");
 
-        ImGui::Separator();
-        // カメラ情報
-        ImGui::Text("Camera");
-        ImGui::Text("Distance: %.2f", debugCamera.distance);
-        ImGui::Text("Pitch: %.2f", debugCamera.pitch);
-        ImGui::Text("Yaw: %.2f", debugCamera.yaw);
-        ImGui::Text("Target: (%.2f, %.2f, %.2f)", debugCamera.target.x, debugCamera.target.y, debugCamera.target.z);
-        ImGui::Separator();
-        //階層構造
-        for (int i = 0; i < 3; ++i) {
-            ImGui::PushID(i); // ラベル被り防止
+        ImGui::Text(" c:%f, %f, %f", c.x, c.y, c.z);
+        ImGui::Text(" d:%f, %f, %f", d.x, d.y, d.z);
+        ImGui::Text(" e:%f, %f, %f", e.x, e.y, e.z);
+        ImGui::Text(
+            "matrix:\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n",
+            rotateMatrix.m[0][0], rotateMatrix.m[0][1], rotateMatrix.m[0][2], rotateMatrix.m[0][3],
+            rotateMatrix.m[1][0], rotateMatrix.m[1][1], rotateMatrix.m[1][2], rotateMatrix.m[1][3],
+            rotateMatrix.m[2][0], rotateMatrix.m[2][1], rotateMatrix.m[2][2], rotateMatrix.m[2][3],
+            rotateMatrix.m[3][0], rotateMatrix.m[3][1], rotateMatrix.m[3][2], rotateMatrix.m[3][3]);
 
-            ImGui::DragFloat3("Translate", &translates[i].x, 0.01f); // 平行移動
-            ImGui::DragFloat3("Rotate", &rotates[i].x, 0.1f); // 回転
-            ImGui::DragFloat3("Scale", &scales[i].x, 0.01f); // スケール
-
-            ImGui::Separator();
-            ImGui::PopID();
-        }
-
-
-        // デバッグカメラリセット
-        if (ImGui::Button("CameraReset")) {
-            debugCamera.Reset();
-        }
         ImGui::End();
 
         debugCamera.UpdateFromImGui();
 
         viewMatrix = debugCamera.GetViewMatrix();
         viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
-
-        // 各ローカル行列を生成
-        Matrix4x4 localMatrix[3];
-        for (int i = 0; i < 3; ++i) {
-            localMatrix[i] = makeAffineMatrix(scales[i], rotates[i], translates[i]);
-        }
-
-        // 親子階層のアフィン変換変換
-        Matrix4x4 worldMatrix[3];
-
-        // 肩が親がいないのでローカル=ワールド
-        worldMatrix[0] = localMatrix[0];
-
-        // 肩のワールド行列を使って、腕のワールド行列を計算
-        worldMatrix[1] = Multiply(localMatrix[1], worldMatrix[0]);
-
-        // 腕のワールド行列を使って、手のワールド行列を計算
-        worldMatrix[2] = Multiply(localMatrix[2], worldMatrix[1]);
 
         ///
         /// ↑更新処理ここまで
@@ -247,58 +207,6 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         ///
         /// ↓描画処理ここから
         ///
-
-        // 球をそれぞれ描画(肩、肘、手)
-        for (int i = 0; i < 3; ++i) {
-
-            Vector3 worldPos = {
-                worldMatrix[i].m[3][0],
-                worldMatrix[i].m[3][1],
-                worldMatrix[i].m[3][2]
-            };
-
-            Sphere sphere = {
-                worldPos,
-                0.05f // 半径
-            };
-
-            // デフォルトは白色
-            uint32_t color = WHITE;
-            if (i == 0)
-                color = RED;
-            else if (i == 1)
-                color = GREEN;
-            else if (i == 2)
-                color = BLUE;
-
-            // 球を描画
-            DrawSphere(sphere, viewProjectionMatrix, viewPortMatrix, color);
-        }
-
-        // 球の中心を結ぶ線を描画
-        Vector3 jointPos[3];
-        for (int i = 0; i < 3; ++i) {
-            jointPos[i] = {
-                worldMatrix[i].m[3][0],
-                worldMatrix[i].m[3][1],
-                worldMatrix[i].m[3][2]
-            };
-        }
-
-        // スクリーン座標に変換
-        Vector3 screenJointPos[3];
-        for (int i = 0; i < 3; ++i) {
-            screenJointPos[i] = TransformCoord(TransformCoord(jointPos[i], viewProjectionMatrix), viewPortMatrix);
-        }
-
-        // 線を描画
-        Novice::DrawLine(
-            int(screenJointPos[0].x), int(screenJointPos[0].y), // 肩
-            int(screenJointPos[1].x), int(screenJointPos[1].y), WHITE); // 肘
-
-        Novice::DrawLine(
-            int(screenJointPos[1].x), int(screenJointPos[1].y), // 肘
-            int(screenJointPos[2].x), int(screenJointPos[2].y), WHITE); // 手
 
         // グリッド線
         DrawGrid(viewProjectionMatrix, viewPortMatrix);
