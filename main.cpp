@@ -116,6 +116,10 @@ void DrawTriangle(const Triangle& triangle, const Matrix4x4& viewProjectionMatri
 // AABBの描画
 void DrawAABB(const AABB& aabb, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
 
+// 2次ベジェ曲線の描画
+void DrawBezier(const Vector3& controlPoint0, const Vector3& controlPoint1, const Vector3& controlPosint2,
+    const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
@@ -143,14 +147,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
     DebugCamera debugCamera;
 
-    AABB aabb1 = {
-        .min { -0.5f, -0.5f, -0.5f },
-        .max { 0.5f, 0.5f, 0.5f }
-    };
-
-    Segment segment = {
-        .origin { -0.7f, 0.3f, 0.0f },
-        .diff { 2.0f, -0.5f, 0.0f }
+    Vector3 controlPoints[3] = {
+        { -0.8f, 0.58f, 1.0f }, // 制御点1
+        { 1.76f, 1.0f, -0.3f }, // 制御点2
+        { 0.94f, -0.7f, 2.3f } // 制御点3
     };
 
     // ウィンドウの×ボタンが押されるまでループ
@@ -166,25 +166,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         /// ↓更新処理ここから
         ///
 
-        // AABBの更新
-        ImGui::Separator();
-        ImGui::Text("AABB1");
-        ImGui::DragFloat3("AABB1 Min", &aabb1.min.x, 0.01f, -5.0f, 5.0f, "%.2f");
-        ImGui::DragFloat3("AABB1 Max", &aabb1.max.x, 0.01f, -5.0f, 5.0f, "%.2f");
-        ImGui::Separator();
-        // 線分
-        ImGui::Text("Segment");
-        ImGui::DragFloat3("Segment Origin", &segment.origin.x, 0.01f, -5.0f, 5.0f, "%.2f");
-        ImGui::DragFloat3("Segment Diff", &segment.diff.x, 0.01f, -5.0f, 5.0f, "%.2f");
-
         // リセットボタン
         if (ImGui::Button("ObjectReset")) {
-
-            aabb1.min = { -0.5f, -0.5f, -0.5f };
-            aabb1.max = { 0.5f, 0.5f, 0.5f };
-
-            segment.origin = { -0.7f, 0.3f, 0.0f };
-            segment.diff = { 2.0f, -0.5f, 0.0f };
         }
 
         ImGui::Separator();
@@ -195,6 +178,13 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         ImGui::Text("Yaw: %.2f", debugCamera.yaw);
         ImGui::Text("Target: (%.2f, %.2f, %.2f)", debugCamera.target.x, debugCamera.target.y, debugCamera.target.z);
         ImGui::Separator();
+        // 制御点の制御
+        ImGui::Text("Control Points");
+        for (int i = 0; i < 3; ++i) {
+            ImGui::PushID(i);
+            ImGui::DragFloat3("Position", &controlPoints[i].x, 0.01f, -10.0f, 10.0f);
+            ImGui::PopID();
+        }
 
         // デバッグカメラリセット
         if (ImGui::Button("CameraReset")) {
@@ -215,19 +205,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         /// ↓描画処理ここから
         ///
 
-        // AABB2の描画
-        if (IsCollision(aabb1, segment)) {
-            DrawAABB(aabb1, viewProjectionMatrix, viewPortMatrix, RED);
-        } else {
+        // ベジェ曲線の描画
+        DrawBezier(
+            controlPoints[0], controlPoints[1], controlPoints[2],
+            viewProjectionMatrix, viewPortMatrix, BLUE);
 
-            DrawAABB(aabb1, viewProjectionMatrix, viewPortMatrix, WHITE);
+        // 制御点の描画
+        for (int i = 0; i < 3; ++i) {
+            Sphere controlPointsSphere;
+            controlPointsSphere.center = controlPoints[i];
+            controlPointsSphere.radius = 0.01f;
+            DrawSphere(controlPointsSphere, viewProjectionMatrix, viewPortMatrix, 0x000000FF);
         }
-
-        // 線分の描画
-        Vector3 start = TransformCoord(TransformCoord(segment.origin, viewProjectionMatrix), viewPortMatrix);
-        Vector3 end = TransformCoord(TransformCoord(Add(segment.origin, segment.diff), viewProjectionMatrix), viewPortMatrix);
-
-        Novice::DrawLine(int(start.x), int(start.y), int(end.x), int(end.y), WHITE);
 
         // グリッド線
         DrawGrid(viewProjectionMatrix, viewPortMatrix);
@@ -345,4 +334,34 @@ void DrawAABB(const AABB& aabb, const Matrix4x4& viewProjectionMatrix, const Mat
     Novice::DrawLine((int)pts[1].x, (int)pts[1].y, (int)pts[5].x, (int)pts[5].y, color);
     Novice::DrawLine((int)pts[2].x, (int)pts[2].y, (int)pts[6].x, (int)pts[6].y, color);
     Novice::DrawLine((int)pts[3].x, (int)pts[3].y, (int)pts[7].x, (int)pts[7].y, color);
+}
+
+// 2次ベジェ曲線の描画
+void DrawBezier(const Vector3& controlPoint0, const Vector3& controlPoint1, const Vector3& controlPosint2, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color)
+{
+    const int kSegmentCount = 20; // 分割数
+
+    for (int i = 0; i < kSegmentCount; ++i) {
+        float t0 = static_cast<float>(i) / static_cast<float>(kSegmentCount);
+        float t1 = static_cast<float>(i + 1) / static_cast<float>(kSegmentCount);
+
+        // 線形補間を使ってベジェ曲線の2点を計算
+        Vector3 p0p1 = Lerp(controlPoint0, controlPoint1, t0);
+        Vector3 p1p2 = Lerp(controlPoint1, controlPosint2, t0);
+        Vector3 p = Lerp(p0p1, p1p2, t0);
+
+        Vector3 p0p1Next = Lerp(controlPoint0, controlPoint1, t1);
+        Vector3 p1p2Next = Lerp(controlPoint1, controlPosint2, t1);
+        Vector3 pNext = Lerp(p0p1Next, p1p2Next, t1);
+
+        // ベジェ曲線の2点をスクリーン座標に変換
+        Vector3 screeenP0 = TransformCoord(TransformCoord(p, viewProjectionMatrix), viewportMatrix);
+        Vector3 screeenP1 = TransformCoord(TransformCoord(pNext, viewProjectionMatrix), viewportMatrix);
+
+        // 線を描画
+        Novice::DrawLine(
+            static_cast<int>(screeenP0.x), static_cast<int>(screeenP0.y),
+            static_cast<int>(screeenP1.x), static_cast<int>(screeenP1.y),
+            color);
+    }
 }

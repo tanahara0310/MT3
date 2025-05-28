@@ -1,8 +1,8 @@
 ﻿#pragma once
 
-#include <cstdint>
-#include <cmath>
 #include <algorithm>
+#include <cmath>
+#include <cstdint>
 #include <numbers>
 
 static const int kRowHeight = 20;
@@ -176,7 +176,6 @@ Matrix4x4 makeAffineMatrix(const Vector3& scale, const Vector3& rotate, const Ve
 
 Matrix4x4 MakeLookAtMatrix(const Vector3& eye, const Vector3& target, const Vector3& up);
 
-
 //================================================
 // 　レンダリングパイプライン用
 //================================================
@@ -200,6 +199,12 @@ Vector3 Project(const Vector3& v1, const Vector3 v2);
 Vector3 ClosestPoint(const Vector3& point, const Segment& segment);
 
 //================================================
+// 2次ベジェ曲線
+//================================================
+
+Vector3 Lerp(const Vector3& v1, const Vector3& v2, float t);
+
+//================================================
 // 　値確認用
 //================================================
 
@@ -207,6 +212,8 @@ void MatrixScreenPrintf(int x, int y, const Matrix4x4& matrix);
 
 void VectorScreenPrintf(int x, int y, const Vector3& vector);
 
+// グリッド
 void DrawGrid(const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix);
 
+// 球体の描画
 void DrawSphere(const Sphere& sphere, const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
