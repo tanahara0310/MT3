@@ -142,7 +142,9 @@ xcopy C:\KamataEngine\DirectXGame\Resources "$(OutDirFullPath)NoviceResources" /
     <ClInclude Include="C:\KamataEngine\DirectXGame\input\Input.h" />
     <ClInclude Include="C:\KamataEngine\DirectXGame\scene\GameScene.h" />
     <ClInclude Include="C:\KamataEngine\Adapter\Novice.h" />
+    <ClInclude Include="Class\MyMath\Matrix\Matrix4x4.h" />
     <ClInclude Include="Class\MyMath\MyCollision.h" />
+    <ClInclude Include="Class\MyMath\Vector\Vector3.h" />
     <ClInclude Include="Collision.h" />
     <ClInclude Include="Class\MyMath\MyMath.h" />
   </ItemGroup>
