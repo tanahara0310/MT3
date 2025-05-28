@@ -135,6 +135,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     // 変数初期化
     //==============================
 
+#pragma region カメラ関連初期化
     Vector3 cameraTranslate = { 0.0f, 1.9f, -6.49f };
     Vector3 cameraRotate = { 0.26f, 0.0f, 0.0f };
 
@@ -145,13 +146,32 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     Matrix4x4 viewPortMatrix = MakeViewportMatrix(0.0f, 0.0f, 1280.0f, 720.0f, 0.0f, 1.0f);
     Matrix4x4 viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 
+    // デバッグカメラの初期化
     DebugCamera debugCamera;
 
-    Vector3 controlPoints[3] = {
-        { -0.8f, 0.58f, 1.0f }, // 制御点1
-        { 1.76f, 1.0f, -0.3f }, // 制御点2
-        { 0.94f, -0.7f, 2.3f } // 制御点3
+#pragma endregion
+
+#pragma region 階層構造を構築
+
+    Vector3 translates[3] = {
+        { 0.2f, 1.0f, 0.0f },
+        { 0.4f, 0.0f, 0.0f },
+        { 0.3f, 0.0f, 0.0f },
     };
+
+    Vector3 rotates[3] = {
+        { 0.0f, 0.0f, -6.8f },
+        { 0.0f, 0.0f, -1.4f },
+        { 0.0f, 0.0f, 0.0f },
+    };
+
+    Vector3 scales[3] = {
+        { 1.0f, 1.0f, 1.0f },
+        { 1.0f, 1.0f, 1.0f },
+        { 1.0f, 1.0f, 1.0f },
+    };
+
+#pragma endregion
 
     // ウィンドウの×ボタンが押されるまでループ
     while (Novice::ProcessMessage() == 0) {
@@ -178,13 +198,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         ImGui::Text("Yaw: %.2f", debugCamera.yaw);
         ImGui::Text("Target: (%.2f, %.2f, %.2f)", debugCamera.target.x, debugCamera.target.y, debugCamera.target.z);
         ImGui::Separator();
-        // 制御点の制御
-        ImGui::Text("Control Points");
+        //階層構造
         for (int i = 0; i < 3; ++i) {
-            ImGui::PushID(i);
-            ImGui::DragFloat3("Position", &controlPoints[i].x, 0.01f, -10.0f, 10.0f);
+            ImGui::PushID(i); // ラベル被り防止
+
+            ImGui::DragFloat3("Translate", &translates[i].x, 0.01f); // 平行移動
+            ImGui::DragFloat3("Rotate", &rotates[i].x, 0.1f); // 回転
+            ImGui::DragFloat3("Scale", &scales[i].x, 0.01f); // スケール
+
+            ImGui::Separator();
             ImGui::PopID();
         }
+
 
         // デバッグカメラリセット
         if (ImGui::Button("CameraReset")) {
@@ -197,6 +222,24 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         viewMatrix = debugCamera.GetViewMatrix();
         viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
 
+        // 各ローカル行列を生成
+        Matrix4x4 localMatrix[3];
+        for (int i = 0; i < 3; ++i) {
+            localMatrix[i] = makeAffineMatrix(scales[i], rotates[i], translates[i]);
+        }
+
+        // 親子階層のアフィン変換変換
+        Matrix4x4 worldMatrix[3];
+
+        // 肩が親がいないのでローカル=ワールド
+        worldMatrix[0] = localMatrix[0];
+
+        // 肩のワールド行列を使って、腕のワールド行列を計算
+        worldMatrix[1] = Multiply(localMatrix[1], worldMatrix[0]);
+
+        // 腕のワールド行列を使って、手のワールド行列を計算
+        worldMatrix[2] = Multiply(localMatrix[2], worldMatrix[1]);
+
         ///
         /// ↑更新処理ここまで
         ///
@@ -205,18 +248,57 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         /// ↓描画処理ここから
         ///
 
-        // ベジェ曲線の描画
-        DrawBezier(
-            controlPoints[0], controlPoints[1], controlPoints[2],
-            viewProjectionMatrix, viewPortMatrix, BLUE);
-
-        // 制御点の描画
+        // 球をそれぞれ描画(肩、肘、手)
         for (int i = 0; i < 3; ++i) {
-            Sphere controlPointsSphere;
-            controlPointsSphere.center = controlPoints[i];
-            controlPointsSphere.radius = 0.01f;
-            DrawSphere(controlPointsSphere, viewProjectionMatrix, viewPortMatrix, 0x000000FF);
+
+            Vector3 worldPos = {
+                worldMatrix[i].m[3][0],
+                worldMatrix[i].m[3][1],
+                worldMatrix[i].m[3][2]
+            };
+
+            Sphere sphere = {
+                worldPos,
+                0.05f // 半径
+            };
+
+            // デフォルトは白色
+            uint32_t color = WHITE;
+            if (i == 0)
+                color = RED;
+            else if (i == 1)
+                color = GREEN;
+            else if (i == 2)
+                color = BLUE;
+
+            // 球を描画
+            DrawSphere(sphere, viewProjectionMatrix, viewPortMatrix, color);
         }
+
+        // 球の中心を結ぶ線を描画
+        Vector3 jointPos[3];
+        for (int i = 0; i < 3; ++i) {
+            jointPos[i] = {
+                worldMatrix[i].m[3][0],
+                worldMatrix[i].m[3][1],
+                worldMatrix[i].m[3][2]
+            };
+        }
+
+        // スクリーン座標に変換
+        Vector3 screenJointPos[3];
+        for (int i = 0; i < 3; ++i) {
+            screenJointPos[i] = TransformCoord(TransformCoord(jointPos[i], viewProjectionMatrix), viewPortMatrix);
+        }
+
+        // 線を描画
+        Novice::DrawLine(
+            int(screenJointPos[0].x), int(screenJointPos[0].y), // 肩
+            int(screenJointPos[1].x), int(screenJointPos[1].y), WHITE); // 肘
+
+        Novice::DrawLine(
+            int(screenJointPos[1].x), int(screenJointPos[1].y), // 肘
+            int(screenJointPos[2].x), int(screenJointPos[2].y), WHITE); // 手
 
         // グリッド線
         DrawGrid(viewProjectionMatrix, viewPortMatrix);
