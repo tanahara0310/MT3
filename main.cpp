@@ -5,6 +5,23 @@
 
 const char kWindowTitle[] = "LE2B_18_タナハラ_コア_タイトル";
 
+struct Spring {
+    // アンカー。固定された端の位置
+    Vector3 anchor;
+    float naturalLength; // 自然長
+    float stiffness; // ばね定数k
+    float dampingCoefficient; // 減衰係数
+};
+
+struct Ball {
+    Vector3 position; // 位置
+    Vector3 velocity; // 速度
+    Vector3 acceleration; // 加速度
+    float mass; // 質量
+    float radius; // 半径
+    unsigned int color; // 色
+};
+
 //==============================
 // 関数定義
 //==============================
@@ -151,20 +168,25 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 #pragma endregion
 
-#pragma region 演算子オーバーロード
+#pragma region ばね初期化
 
-    Vector3 a { 0.2f, 1.0f, 0.0f };
-    Vector3 b { 2.4f, 3.1f, 1.2f };
+    Spring spring {};
+    spring.anchor = { 0.0f, 0.0f, 0.0f }; // アンカー位置
+    spring.naturalLength = 1.0f; // 自然長
+    spring.stiffness = 100.0f; // ばね定数k
+    spring.dampingCoefficient = 2.0f; // 減衰係数
 
-    Vector3 c = a + b;
-    Vector3 d = a - b;
-    Vector3 e = a * 2.4f;
-    Vector3 rotate { 0.4f, 1.43f, -0.8f };
+    Ball ball {};
+    ball.position = { 1.2f, 0.0f, 0.0f }; // 初期位置
+    ball.mass = 2.0f; // 質量
+    ball.radius = 0.05f; // 半径
+    ball.color = BLUE; // 色
 
-    Matrix4x4 rotateXMatrix = MakeRotationXMatrix(rotate.x);
-    Matrix4x4 rotateYMatrix = MakeRotationYMatrix(rotate.y);
-    Matrix4x4 rotateZMatrix = MakeRotationZMatrix(rotate.z);
-    Matrix4x4 rotateMatrix = rotateXMatrix * rotateYMatrix * rotateZMatrix;
+    Sphere sphere;
+    sphere.center = ball.position; // 球の中心
+    sphere.radius = ball.radius; // 球の半径
+
+    bool isStarted = false; // シミュレーション開始フラグ
 
 #pragma endregion
 
@@ -181,20 +203,36 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         /// ↓更新処理ここから
         ///
 
-        ImGui::Begin("Window");
+        float deltaTime = 1.0f / 60.0f;
 
-        ImGui::Text(" c:%f, %f, %f", c.x, c.y, c.z);
-        ImGui::Text(" d:%f, %f, %f", d.x, d.y, d.z);
-        ImGui::Text(" e:%f, %f, %f", e.x, e.y, e.z);
-        ImGui::Text(
-            "matrix:\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n%f, %f, %f, %f\n",
-            rotateMatrix.m[0][0], rotateMatrix.m[0][1], rotateMatrix.m[0][2], rotateMatrix.m[0][3],
-            rotateMatrix.m[1][0], rotateMatrix.m[1][1], rotateMatrix.m[1][2], rotateMatrix.m[1][3],
-            rotateMatrix.m[2][0], rotateMatrix.m[2][1], rotateMatrix.m[2][2], rotateMatrix.m[2][3],
-            rotateMatrix.m[3][0], rotateMatrix.m[3][1], rotateMatrix.m[3][2], rotateMatrix.m[3][3]);
+        if (isStarted) {
 
-        ImGui::End();
+            Vector3 diff = ball.position - spring.anchor; // ばねの伸び
+            float length = Length(diff); // ばねの長さ
+            if (length != 0.0f) {
+                Vector3 direction = Normalize(diff); // ばねの方向
+                // ばねの自然長との差を計算
+                Vector3 restPosition = spring.anchor + direction * spring.naturalLength;
+                // ばねの変位を計算
+                Vector3 displacement = length * (ball.position - restPosition);
+                // ばねの復元力の計算
+                Vector3 restoringForce = -spring.stiffness * displacement;
+                // 減衰力の計算
+                Vector3 dampingForce = -spring.dampingCoefficient * ball.velocity;
+                // 減衰抵抗も加味して、物体にかかる力を決定
+                Vector3 force = restoringForce + dampingForce;
+                ball.acceleration = force / ball.mass; // 加速度
+            }
 
+            // 加速度も速度もどちらも秒を基準とした値
+            ball.velocity += ball.acceleration * deltaTime; // 速度更新
+            ball.position += ball.velocity * deltaTime; // 位置更新
+
+            // DrawSpherに渡すため球の中心を更新
+            sphere.center = ball.position;
+        }
+
+        // デバッグカメラの更新
         debugCamera.UpdateFromImGui();
 
         viewMatrix = debugCamera.GetViewMatrix();
@@ -208,8 +246,43 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         /// ↓描画処理ここから
         ///
 
+        // デバッグカメラの位置と注視点を表示
+        ImGui::Begin("Debug Camera");
+        ImGui::Text("Position: (%.2f, %.2f, %.2f)", debugCamera.GetPosition().x, debugCamera.GetPosition().y, debugCamera.GetPosition().z);
+        ImGui::Text("Target: (%.2f, %.2f, %.2f)", debugCamera.target.x, debugCamera.target.y, debugCamera.target.z);
+        ImGui::Text("Distance: %.2f", debugCamera.distance);
+        ImGui::Text("Pitch: %.2f", debugCamera.pitch);
+        ImGui::Text("Yaw: %.2f", debugCamera.yaw);
+
+        // カメラのリセットボタン
+        if (ImGui::Button("Reset Camera")) {
+            debugCamera.Reset();
+        }
+
+        // シミュレーション開始ボタン
+        if (ImGui::Button("Start Simulation")) {
+            isStarted = true;
+        }
+        ImGui::End();
+
         // グリッド線
         DrawGrid(viewProjectionMatrix, viewPortMatrix);
+
+        // 球の位置を表示
+        DrawSphere(
+            sphere, // 球の中心
+            viewProjectionMatrix, // ビュー→プロジェクション行列
+            viewPortMatrix, // ビューポート変換行列
+            ball.color); // 色
+
+        // ばねの描画
+        Vector3 anchorScreenPos = TransformCoord(TransformCoord(spring.anchor, viewProjectionMatrix), viewPortMatrix);
+        Vector3 sphereScreenPos = TransformCoord(TransformCoord(sphere.center, viewProjectionMatrix), viewPortMatrix);
+
+        Novice::DrawLine(
+            int(anchorScreenPos.x), int(anchorScreenPos.y),
+            int(sphereScreenPos.x), int(sphereScreenPos.y),
+            WHITE);
 
         ///
         /// ↑描画処理ここまで
