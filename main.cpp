@@ -168,23 +168,19 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 #pragma endregion
 
-#pragma region ばね初期化
+#pragma region 円運動初期化
 
-    Spring spring {};
-    spring.anchor = { 0.0f, 0.0f, 0.0f }; // アンカー位置
-    spring.naturalLength = 1.0f; // 自然長
-    spring.stiffness = 100.0f; // ばね定数k
-    spring.dampingCoefficient = 2.0f; // 減衰係数
+    Vector3 circleCenter = { 0.0f, 0.0f, 0.0f }; // 円の中心位置
+    float circleRadius = 0.8f; // 円の半径
+    float angle = 0.0f; // 初期角度
+    float angleVelocity = std::numbers::pi_v<float>; // 角速度（ラジアン/秒）
 
-    Ball ball {};
-    ball.position = { 1.2f, 0.0f, 0.0f }; // 初期位置
-    ball.mass = 2.0f; // 質量
-    ball.radius = 0.05f; // 半径
-    ball.color = BLUE; // 色
-
+    // 球の初期化
     Sphere sphere;
-    sphere.center = ball.position; // 球の中心
-    sphere.radius = ball.radius; // 球の半径
+    sphere.center.x = circleCenter.x + std::cos(angle) * circleRadius; // 球の初期位置
+    sphere.center.y = circleCenter.y + std::sin(angle) * circleRadius; // 球の初期位置
+    sphere.center.z = circleCenter.z; // z座標は固定
+    sphere.radius = 0.05f; // 球の半径
 
     bool isStarted = false; // シミュレーション開始フラグ
 
@@ -205,38 +201,29 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
         float deltaTime = 1.0f / 60.0f;
 
+#pragma region 円運動更新
+
         if (isStarted) {
 
-            Vector3 diff = ball.position - spring.anchor; // ばねの伸び
-            float length = Length(diff); // ばねの長さ
-            if (length != 0.0f) {
-                Vector3 direction = Normalize(diff); // ばねの方向
-                // ばねの自然長との差を計算
-                Vector3 restPosition = spring.anchor + direction * spring.naturalLength;
-                // ばねの変位を計算
-                Vector3 displacement = length * (ball.position - restPosition);
-                // ばねの復元力の計算
-                Vector3 restoringForce = -spring.stiffness * displacement;
-                // 減衰力の計算
-                Vector3 dampingForce = -spring.dampingCoefficient * ball.velocity;
-                // 減衰抵抗も加味して、物体にかかる力を決定
-                Vector3 force = restoringForce + dampingForce;
-                ball.acceleration = force / ball.mass; // 加速度
-            }
+            angle += angleVelocity * deltaTime; // 角度を更新
 
-            // 加速度も速度もどちらも秒を基準とした値
-            ball.velocity += ball.acceleration * deltaTime; // 速度更新
-            ball.position += ball.velocity * deltaTime; // 位置更新
-
-            // DrawSpherに渡すため球の中心を更新
-            sphere.center = ball.position;
+            // 球の位置を更新
+            sphere.center.x = circleCenter.x + std::cos(angle) * circleRadius;
+            sphere.center.y = circleCenter.y + std::sin(angle) * circleRadius;
+            sphere.center.z = circleCenter.z; // z座標は固定
         }
+
+#pragma endregion
+
+#pragma region カメラ更新
 
         // デバッグカメラの更新
         debugCamera.UpdateFromImGui();
 
         viewMatrix = debugCamera.GetViewMatrix();
         viewProjectionMatrix = Multiply(viewMatrix, projectionMatrix);
+
+#pragma endregion
 
         ///
         /// ↑更新処理ここまで
@@ -246,6 +233,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         /// ↓描画処理ここから
         ///
 
+#pragma region imgui
         // デバッグカメラの位置と注視点を表示
         ImGui::Begin("Debug Camera");
         ImGui::Text("Position: (%.2f, %.2f, %.2f)", debugCamera.GetPosition().x, debugCamera.GetPosition().y, debugCamera.GetPosition().z);
@@ -263,26 +251,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         if (ImGui::Button("Start Simulation")) {
             isStarted = true;
         }
+
         ImGui::End();
+
+#pragma endregion
+
+        DrawSphere(sphere, viewProjectionMatrix, viewPortMatrix, WHITE); // 球の描画
 
         // グリッド線
         DrawGrid(viewProjectionMatrix, viewPortMatrix);
-
-        // 球の位置を表示
-        DrawSphere(
-            sphere, // 球の中心
-            viewProjectionMatrix, // ビュー→プロジェクション行列
-            viewPortMatrix, // ビューポート変換行列
-            ball.color); // 色
-
-        // ばねの描画
-        Vector3 anchorScreenPos = TransformCoord(TransformCoord(spring.anchor, viewProjectionMatrix), viewPortMatrix);
-        Vector3 sphereScreenPos = TransformCoord(TransformCoord(sphere.center, viewProjectionMatrix), viewPortMatrix);
-
-        Novice::DrawLine(
-            int(anchorScreenPos.x), int(anchorScreenPos.y),
-            int(sphereScreenPos.x), int(sphereScreenPos.y),
-            WHITE);
 
         ///
         /// ↑描画処理ここまで
