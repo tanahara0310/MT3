@@ -28,6 +28,12 @@ struct Vector3 {
         return { x * scalar, y * scalar, z * scalar };
     }
 
+    // ベクトル除算(Vector3 / float)
+    Vector3 operator/(float scalar) const
+    {
+        return { x / scalar, y / scalar, z / scalar };
+    }
+
     //========================================
     // 　複合代入演算子
     //========================================
@@ -68,6 +74,12 @@ struct Vector3 {
         return *this;
     }
 };
+
+// スカラーとベクトルの乗算 (float * Vector3)
+inline Vector3 operator*(float scalar, const Vector3& v)
+{
+    return { scalar * v.x, scalar * v.y, scalar * v.z };
+}
 
 //========================================
 // 　単項演算子
