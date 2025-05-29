@@ -35,6 +35,14 @@ struct Pendulum {
     float angularAcceleration; // 角加速度
 };
 
+struct ConicalPendulum {
+    Vector3 anchor; // アンカーポイント。固定された端の位置
+    float length; // ひもの長さ
+    float halfApexAngle; // 円錐の頂角の半分
+    float angle; // 現在の角度
+    float angularVelocity; // 角速度
+};
+
 //==============================
 // 関数定義
 //==============================
@@ -181,20 +189,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 #pragma endregion
 
-#pragma region 振り子初期化
+#pragma region 円錐振り子初期化
 
-    Pendulum pendulum;
-    pendulum.anchor = { 0.0f, 1.0f, 0.0f }; // アンカーポイント
-    pendulum.length = 0.8f; // ひもの長さ
-    pendulum.angle = 0.7f; // 現在の角度
-    pendulum.angularVelocity = 0.0f; // 角速度
-    pendulum.angularAcceleration = 0.0f; // 角加速度
+    ConicalPendulum conicalPendulum;
+    conicalPendulum.anchor = { 0.0f, 1.0f, 0.0f }; // アンカーポイント
+    conicalPendulum.length = 0.8f; // ひもの長さ
+    conicalPendulum.halfApexAngle = 0.7f; // 円錐の頂角の半分
+    conicalPendulum.angle = 0.0f; // 現在の角度
+    conicalPendulum.angularVelocity = 0.0f; // 角速度
 
-    Sphere sphere;
-    sphere.center = { pendulum.anchor.x + pendulum.length * std::sin(pendulum.angle),
-        pendulum.anchor.y - pendulum.length * std::cos(pendulum.angle),
-        pendulum.anchor.z }; // 球の中心位置
-    sphere.radius = 0.08f; // 球の半径
+    Sphere bob;
+    bob.center.x = conicalPendulum.anchor.x + std::sin(conicalPendulum.halfApexAngle) * conicalPendulum.length;
+    bob.center.y = conicalPendulum.anchor.y - std::cos(conicalPendulum.halfApexAngle) * conicalPendulum.length; // 上方向が負のY軸
+    bob.center.z = conicalPendulum.anchor.z;
+    bob.radius = 0.08f; // 振り子の玉の半径
 
     bool isStarted = false; // シミュレーション開始フラグ
 
@@ -219,14 +227,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
         if (isStarted) {
 
-            pendulum.angularAcceleration = (-9.8f / pendulum.length) * std::sin(pendulum.angle);
-            pendulum.angularVelocity += pendulum.angularAcceleration * deltaTime;
-            pendulum.angle += pendulum.angularVelocity * deltaTime;
+            conicalPendulum.angularVelocity = std::sqrt(9.8f / (conicalPendulum.length * std::cos(conicalPendulum.halfApexAngle)));
+            conicalPendulum.angle += conicalPendulum.angularVelocity * deltaTime;
 
-            // 球の位置を更新
-            sphere.center.x = pendulum.anchor.x + pendulum.length * std::sin(pendulum.angle);
-            sphere.center.y = pendulum.anchor.y - pendulum.length * std::cos(pendulum.angle);
-            sphere.center.z = pendulum.anchor.z;
+            float radius = std::sin(conicalPendulum.halfApexAngle) * conicalPendulum.length;
+            float height = std::cos(conicalPendulum.halfApexAngle) * conicalPendulum.length;
+
+            // 振り子の玉の位置を更新
+            bob.center.x = conicalPendulum.anchor.x + radius * std::sin(conicalPendulum.angle);
+            bob.center.y = conicalPendulum.anchor.y - height;
+            bob.center.z = conicalPendulum.anchor.z - radius * std::cos(conicalPendulum.angle);
         }
 
 #pragma endregion
@@ -272,17 +282,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 #pragma endregion
 
-        // 振り子の線を描画
-        Vector3 screenAnchor = TransformCoord(TransformCoord(pendulum.anchor, viewProjectionMatrix), viewPortMatrix);
-        Vector3 screenBall = TransformCoord(TransformCoord(sphere.center, viewProjectionMatrix), viewPortMatrix);
+        // 振り子の線の描画
+        Vector3 screenAnchor = TransformCoord(TransformCoord(conicalPendulum.anchor, viewProjectionMatrix), viewPortMatrix);
+        Vector3 screenBob = TransformCoord(TransformCoord(bob.center, viewProjectionMatrix), viewPortMatrix);
 
         Novice::DrawLine(
-            static_cast<int>(screenAnchor.x), static_cast<int>(screenAnchor.y),
-            static_cast<int>(screenBall.x), static_cast<int>(screenBall.y),
-            WHITE); // 白色で線を描画
+            int(screenAnchor.x), int(screenAnchor.y),
+            int(screenBob.x), int(screenBob.y), WHITE);
 
-        // 振り子の球を描画
-        DrawSphere(sphere, viewProjectionMatrix, viewPortMatrix, WHITE);
+        // 振り子の玉の描画
+        DrawSphere(bob, viewProjectionMatrix, viewPortMatrix, WHITE);
 
         // グリッド線
         DrawGrid(viewProjectionMatrix, viewPortMatrix);
