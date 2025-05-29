@@ -5,6 +5,9 @@
 
 const char kWindowTitle[] = "LE2B_18_タナハラ_コア_タイトル";
 
+/// <summary>
+/// ばね構造体
+/// </summary>
 struct Spring {
     // アンカー。固定された端の位置
     Vector3 anchor;
@@ -12,7 +15,9 @@ struct Spring {
     float stiffness; // ばね定数k
     float dampingCoefficient; // 減衰係数
 };
-
+/// <summary>
+/// ボール構造体
+/// </summary>
 struct Ball {
     Vector3 position; // 位置
     Vector3 velocity; // 速度
@@ -20,6 +25,14 @@ struct Ball {
     float mass; // 質量
     float radius; // 半径
     unsigned int color; // 色
+};
+
+struct Pendulum {
+    Vector3 anchor; // アンカーポイント。固定された端の位置
+    float length; // ひもの長さ
+    float angle; // 現在の角度
+    float angularVelocity; // 角速度
+    float angularAcceleration; // 角加速度
 };
 
 //==============================
@@ -168,19 +181,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 #pragma endregion
 
-#pragma region 円運動初期化
+#pragma region 振り子初期化
 
-    Vector3 circleCenter = { 0.0f, 0.0f, 0.0f }; // 円の中心位置
-    float circleRadius = 0.8f; // 円の半径
-    float angle = 0.0f; // 初期角度
-    float angleVelocity = std::numbers::pi_v<float>; // 角速度（ラジアン/秒）
+    Pendulum pendulum;
+    pendulum.anchor = { 0.0f, 1.0f, 0.0f }; // アンカーポイント
+    pendulum.length = 0.8f; // ひもの長さ
+    pendulum.angle = 0.7f; // 現在の角度
+    pendulum.angularVelocity = 0.0f; // 角速度
+    pendulum.angularAcceleration = 0.0f; // 角加速度
 
-    // 球の初期化
     Sphere sphere;
-    sphere.center.x = circleCenter.x + std::cos(angle) * circleRadius; // 球の初期位置
-    sphere.center.y = circleCenter.y + std::sin(angle) * circleRadius; // 球の初期位置
-    sphere.center.z = circleCenter.z; // z座標は固定
-    sphere.radius = 0.05f; // 球の半径
+    sphere.center = { pendulum.anchor.x + pendulum.length * std::sin(pendulum.angle),
+        pendulum.anchor.y - pendulum.length * std::cos(pendulum.angle),
+        pendulum.anchor.z }; // 球の中心位置
+    sphere.radius = 0.08f; // 球の半径
 
     bool isStarted = false; // シミュレーション開始フラグ
 
@@ -201,16 +215,18 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
         float deltaTime = 1.0f / 60.0f;
 
-#pragma region 円運動更新
+#pragma region 振り子更新
 
         if (isStarted) {
 
-            angle += angleVelocity * deltaTime; // 角度を更新
+            pendulum.angularAcceleration = (-9.8f / pendulum.length) * std::sin(pendulum.angle);
+            pendulum.angularVelocity += pendulum.angularAcceleration * deltaTime;
+            pendulum.angle += pendulum.angularVelocity * deltaTime;
 
             // 球の位置を更新
-            sphere.center.x = circleCenter.x + std::cos(angle) * circleRadius;
-            sphere.center.y = circleCenter.y + std::sin(angle) * circleRadius;
-            sphere.center.z = circleCenter.z; // z座標は固定
+            sphere.center.x = pendulum.anchor.x + pendulum.length * std::sin(pendulum.angle);
+            sphere.center.y = pendulum.anchor.y - pendulum.length * std::cos(pendulum.angle);
+            sphere.center.z = pendulum.anchor.z;
         }
 
 #pragma endregion
@@ -256,7 +272,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 #pragma endregion
 
-        DrawSphere(sphere, viewProjectionMatrix, viewPortMatrix, WHITE); // 球の描画
+        // 振り子の線を描画
+        Vector3 screenAnchor = TransformCoord(TransformCoord(pendulum.anchor, viewProjectionMatrix), viewPortMatrix);
+        Vector3 screenBall = TransformCoord(TransformCoord(sphere.center, viewProjectionMatrix), viewPortMatrix);
+
+        Novice::DrawLine(
+            static_cast<int>(screenAnchor.x), static_cast<int>(screenAnchor.y),
+            static_cast<int>(screenBall.x), static_cast<int>(screenBall.y),
+            WHITE); // 白色で線を描画
+
+        // 振り子の球を描画
+        DrawSphere(sphere, viewProjectionMatrix, viewPortMatrix, WHITE);
 
         // グリッド線
         DrawGrid(viewProjectionMatrix, viewPortMatrix);
