@@ -15,6 +15,7 @@ struct Spring {
     float stiffness; // ばね定数k
     float dampingCoefficient; // 減衰係数
 };
+
 /// <summary>
 /// ボール構造体
 /// </summary>
@@ -42,6 +43,8 @@ struct ConicalPendulum {
     float angle; // 現在の角度
     float angularVelocity; // 角速度
 };
+
+;
 
 //==============================
 // 関数定義
@@ -158,6 +161,9 @@ void DrawAABB(const AABB& aabb, const Matrix4x4& viewProjectionMatrix, const Mat
 void DrawBezier(const Vector3& controlPoint0, const Vector3& controlPoint1, const Vector3& controlPosint2,
     const Matrix4x4& viewProjectionMatrix, const Matrix4x4& viewportMatrix, uint32_t color);
 
+// 反射ベクトルを求める関数
+Vector3 Reflect(const Vector3& input, const Vector3& normal);
+
 // Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
@@ -189,20 +195,20 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
 #pragma endregion
 
-#pragma region 円錐振り子初期化
+#pragma region 平面衝突初期化
 
-    ConicalPendulum conicalPendulum;
-    conicalPendulum.anchor = { 0.0f, 1.0f, 0.0f }; // アンカーポイント
-    conicalPendulum.length = 0.8f; // ひもの長さ
-    conicalPendulum.halfApexAngle = 0.7f; // 円錐の頂角の半分
-    conicalPendulum.angle = 0.0f; // 現在の角度
-    conicalPendulum.angularVelocity = 0.0f; // 角速度
+    Plane plane;
+    plane.normal = Normalize({ -0.2f, 0.9f, -0.3f });
+    plane.distance = 0.0f; // 原点からの距離
 
-    Sphere bob;
-    bob.center.x = conicalPendulum.anchor.x + std::sin(conicalPendulum.halfApexAngle) * conicalPendulum.length;
-    bob.center.y = conicalPendulum.anchor.y - std::cos(conicalPendulum.halfApexAngle) * conicalPendulum.length; // 上方向が負のY軸
-    bob.center.z = conicalPendulum.anchor.z;
-    bob.radius = 0.08f; // 振り子の玉の半径
+    Ball ball {};
+    ball.position = { 0.8f, 1.2f, 0.3f };
+    ball.mass = 2.0f;
+    ball.radius = 0.05f;
+    ball.acceleration = { 0.0f, -9.8f, 0.0f }; // 重力加速度
+    ball.color = WHITE;
+
+    float e = 0.8f; // 反発係数
 
     bool isStarted = false; // シミュレーション開始フラグ
 
@@ -227,16 +233,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 
         if (isStarted) {
 
-            conicalPendulum.angularVelocity = std::sqrt(9.8f / (conicalPendulum.length * std::cos(conicalPendulum.halfApexAngle)));
-            conicalPendulum.angle += conicalPendulum.angularVelocity * deltaTime;
-
-            float radius = std::sin(conicalPendulum.halfApexAngle) * conicalPendulum.length;
-            float height = std::cos(conicalPendulum.halfApexAngle) * conicalPendulum.length;
-
-            // 振り子の玉の位置を更新
-            bob.center.x = conicalPendulum.anchor.x + radius * std::sin(conicalPendulum.angle);
-            bob.center.y = conicalPendulum.anchor.y - height;
-            bob.center.z = conicalPendulum.anchor.z - radius * std::cos(conicalPendulum.angle);
+            ball.velocity += ball.acceleration * deltaTime; // 速度更新
+            ball.position += ball.velocity * deltaTime; // 位置更新
+            if (IsCollision(Sphere { ball.position, ball.radius }, plane)) {
+                Vector3 reflected = Reflect(ball.velocity, plane.normal);
+                Vector3 projectToNormal = Project(reflected, plane.normal);
+                Vector3 movingDirection = reflected - projectToNormal;
+                // 反発係数を考慮して速度を更新
+                ball.velocity = projectToNormal * e + movingDirection;
+            }
         }
 
 #pragma endregion
@@ -268,6 +273,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         ImGui::Text("Pitch: %.2f", debugCamera.pitch);
         ImGui::Text("Yaw: %.2f", debugCamera.yaw);
 
+        // 平面のパラメータを調整
+        ImGui::SliderFloat3("Plane Normal", &plane.normal.x, -1.0f, 1.0f);
+        ImGui::SliderFloat("Plane Distance", &plane.distance, -5.0f, 5.0f);
+
         // カメラのリセットボタン
         if (ImGui::Button("Reset Camera")) {
             debugCamera.Reset();
@@ -276,22 +285,22 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         // シミュレーション開始ボタン
         if (ImGui::Button("Start Simulation")) {
             isStarted = true;
+
+            ball.position = { 0.8f, 1.2f, 0.3f }; // 初期位置に戻す
+            ball.velocity = { 0.0f, 0.0f, 0.0f }; // 初期速度に戻す
         }
 
         ImGui::End();
 
 #pragma endregion
 
-        // 振り子の線の描画
-        Vector3 screenAnchor = TransformCoord(TransformCoord(conicalPendulum.anchor, viewProjectionMatrix), viewPortMatrix);
-        Vector3 screenBob = TransformCoord(TransformCoord(bob.center, viewProjectionMatrix), viewPortMatrix);
+        // 平面の描画
+        DrawPlane(plane, viewProjectionMatrix, viewPortMatrix, WHITE);
 
-        Novice::DrawLine(
-            int(screenAnchor.x), int(screenAnchor.y),
-            int(screenBob.x), int(screenBob.y), WHITE);
-
-        // 振り子の玉の描画
-        DrawSphere(bob, viewProjectionMatrix, viewPortMatrix, WHITE);
+        // ボールの描画
+        DrawSphere(
+            Sphere { ball.position, ball.radius },
+            viewProjectionMatrix, viewPortMatrix, ball.color);
 
         // グリッド線
         DrawGrid(viewProjectionMatrix, viewPortMatrix);
@@ -439,4 +448,13 @@ void DrawBezier(const Vector3& controlPoint0, const Vector3& controlPoint1, cons
             static_cast<int>(screeenP1.x), static_cast<int>(screeenP1.y),
             color);
     }
+}
+
+Vector3 Reflect(const Vector3& input, const Vector3& normal)
+{
+    // 入力ベクトルを正規化
+    Vector3 normalizedNormal = Normalize(normal);
+    // 入力ベクトルと法線ベクトルの内積を計算
+    float dotIn = Dot(input, normalizedNormal);
+    return Subtract(input, Multiply(2.0f * dotIn, normalizedNormal));
 }
